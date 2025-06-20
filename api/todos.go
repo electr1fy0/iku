@@ -1,4 +1,4 @@
-package handler
+package main
 
 import (
 	"encoding/json"
@@ -8,21 +8,35 @@ import (
 	"github.com/supabase-community/supabase-go"
 )
 
-func Todos(w http.ResponseWriter, r *http.Request) {
+type TodoRequest struct {
+	Task string `json:"task"`
+}
+
+func Handler(w http.ResponseWriter, r *http.Request) {
+	var req TodoRequest
+	json.NewDecoder(r.Body).Decode(&req)
+
+	if req.Task == "" {
+		http.Error(w, "Missing task", http.StatusBadRequest)
+		return
+	}
+
 	client, _ := supabase.NewClient(
 		os.Getenv("SUPABASE_URL"),
 		os.Getenv("SUPABASE_KEY"),
 		&supabase.ClientOptions{},
 	)
 
-	var todos []map[string]interface{}
-	err := client.DB.From("todos").Select("*").Order("created_at", &supabase.OrderOpts{Ascending: false}).Execute(&todos)
+	todo := map[string]interface{}{
+		"task": req.Task,
+	}
+
+	err := client.DB.From("todos").Insert(todo).Execute(&todo)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(todos)
+	w.Write([]byte("Added task: " + req.Task))
 }
